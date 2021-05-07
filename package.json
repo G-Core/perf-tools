@@ -1,0 +1,27 @@
+{
+  "name": "perf-tools",
+  "version": "1.0.0",
+  "description": "Web perfomance tools for Gcore CDN",
+  "main": "gcdn-perf.js",
+  "scripts": {
+    "dev": "parcel example/index.html",
+    "build": "parcel build gcdn-perf.js -d build --no-source-maps --target browser"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/G-Core/perf-tools.git"
+  },
+  "keywords": [
+    "perfomance",
+    "stats"
+  ],
+  "author": "Zaycev Denis",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/G-Core/perf-tools/issues"
+  },
+  "homepage": "https://github.com/G-Core/perf-tools#readme",
+  "devDependencies": {
+    "parcel-bundler": "^1.12.5"
+  }
+}
