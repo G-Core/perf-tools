@@ -3,3 +3,4 @@
 /.cache/
 /dist
 /build
+/dist_test/

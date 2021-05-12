@@ -1,11 +1,14 @@
 {
   "name": "perf-tools",
   "version": "1.0.0",
-  "description": "Web perfomance tools for Gcore CDN",
-  "main": "gcdn-perf.js",
+  "description": "Web performance tools for Gcore CDN",
+  "main": "src/gcdn-perf.js",
   "scripts": {
     "dev": "parcel example/index.html",
-    "build": "parcel build gcdn-perf.js -d build --no-source-maps --target browser"
+    "build": "parcel build src/gcdn-perf.js -d build --no-source-maps --target browser",
+    "pretest": "parcel build src/perf-lib.js -d dist_test",
+    "test": "mocha",
+    "posttest": "rm -rf dist_test"
   },
   "repository": {
     "type": "git",
@@ -23,5 +26,9 @@
   "homepage": "https://github.com/G-Core/perf-tools#readme",
   "devDependencies": {
     "parcel-bundler": "^1.12.5"
+  },
+  "dependencies": {
+    "chai": "^4.3.4",
+    "mocha": "^8.4.0"
   }
 }

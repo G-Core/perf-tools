@@ -1,0 +1,11 @@
+{
+  "fullTrace": true,
+  "timeout": 60000,
+  "recursive": true,
+  "require": [
+    "chai/register-expect"
+  ],
+  "spec": [
+    "test/**/*.spec.js"
+  ]
+}
