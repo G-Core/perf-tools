@@ -1,11 +1,10 @@
 const {
-    createFilter,
-    starFilter,
-    createStartsWithFilter,
+    createFilterOf,
     createPerfStatPackage,
     isFulfilledPerfStatPackage,
     createFuncWithTimeout,
     createBufferWhen,
+    filterRecords
 } = require('../dist_test/perf-lib.js');
 const { expect } = require('chai');
 
@@ -45,25 +44,7 @@ const createResourceTiming = (override) => {
 
 describe('function tests libs', () => {
     it('should trusted path which start with http://gcdn.co or https://gcdn.co', () => {
-        const filter = createFilter('^http://gcdn[.]co', '^https://gcdn[.]co');
-
-        expect(filter('cdn.gcdn.co')).equal(false);
-        expect(filter('http://cdn.gcdn.co')).equal(false);
-        expect(filter('http://cdn.gcdntco')).equal(false);
-        expect(filter('http://gcdntco')).equal(false);
-        expect(filter('https://cdn.gcdn.co')).equal(false);
-        expect(filter('ftp://cdn.gcdn.co')).equal(false);
-        expect(filter('http://0.gcdn.co')).equal(false);
-        expect(filter('http://0.gcdn.co/test')).equal(false);
-
-        expect(filter('https://gcdn.co')).equal(true);
-        expect(filter('http://gcdn.co')).equal(true);
-        expect(filter('https://gcdn.co/fonts/inter.woff')).equal(true);
-        expect(filter('http://gcdn.co/fonts/inter.woff')).equal(true);
-    });
-
-    it('should trusted path which starts with ', () => {
-        const filter = createStartsWithFilter('http://gcdn.co', 'https://gcdn.co');
+        const filter = createFilterOf('http://gcdn.co', 'https://gcdn.co');
 
         expect(filter('cdn.gcdn.co')).equal(false);
         expect(filter('http://cdn.gcdn.co')).equal(false);
@@ -81,22 +62,11 @@ describe('function tests libs', () => {
     });
 
     it('should trusted path which equal http://gcdn.co/fonts/inter.woff', () => {
-        const filter = createFilter('http://gcdn[.]co/fonts/inter[.]woff');
+        const filter = createFilterOf('http://gcdn.co/fonts/inter.woff');
 
         expect(filter('https://gcdn.co')).equal(false);
         expect(filter('http://gcdn.co')).equal(false);
         expect(filter('https://gcdn.co/fonts/inter.woff')).equal(false);
-        expect(filter('https://cdn.gcdn.co/fonts/inter.woff/test')).equal(false);
-        expect(filter('http://gcdn.co/fonts/inter.woff')).equal(true);
-    });
-
-    it('should trusted any path', () => {
-        const filter = starFilter;
-
-        expect(filter('https://gcdn.co')).equal(true);
-        expect(filter('http://gcdn.co')).equal(true);
-        expect(filter('https://gcdn.co/fonts/inter.woff')).equal(true);
-        expect(filter('https://cdn.gcdn.co/fonts/inter.woff/test')).equal(true);
         expect(filter('http://gcdn.co/fonts/inter.woff')).equal(true);
     });
 
@@ -118,8 +88,9 @@ describe('function tests libs', () => {
             },
         };
 
-        const filter = createStartsWithFilter('http://gcdn.co/fonts/inter.woff', 'http://cdn.gcdn.co');
-        const pack = createPerfStatPackage(records, {filter, takeConnection: true});
+        const filter = createFilterOf('http://gcdn.co/fonts/inter.woff', 'http://cdn.gcdn.co');
+        const filteredRecords = filterRecords(records, filter);
+        const pack = createPerfStatPackage(filteredRecords, {takeConnection: true});
         expect(isFulfilledPerfStatPackage(pack)).equal(true);
         expect(pack.resources.length).equal(2)
         expect(pack.conn).deep.equal({

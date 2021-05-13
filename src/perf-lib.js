@@ -19,65 +19,47 @@ export const createHttpClient = (apiUrl) => {
 }
 
 /**
- * @returns {(function(): boolean)|(function(*=): *)}
- * @param {string | RegExp} rawPatterns
- */
-export const createFilter = (...rawPatterns) => {
-    const patterns = rawPatterns.map((item) => new RegExp(item));
-    return name => patterns.some((pattern) => pattern.test(name))
-}
-
-/**
  *
  * @param {string} patterns
  * @returns {function(*): boolean}
  */
-export const createStartsWithFilter = (...patterns) => {
-    return name => patterns.some((pattern) => name.startsWith(pattern))
+export const createFilterOf = (...patterns) => {
+    return name => patterns.some((pattern) => name.indexOf(pattern) === 0)
 }
-
-/**
- * @returns {boolean}
- */
-export const starFilter = name => true;
 
 /**
  *
  * @param {PerformanceResourceTiming[]} records
- * @param {function(string): boolean} filter
  * @param {boolean} takeConnection
  * @returns {{resources: *[], conn: *}}
  */
 export const createPerfStatPackage = (records, {
-    filter = starFilter,
     takeConnection = true
-}) => {
+} = {}) => {
     const data = {
         resources: []
     };
 
     for (let i = 0; i <= records.length - 1; i++) {
-        if (filter(records[i].name)) {
-            const e = records[i];
-            data.resources.push({
-                metrics: {
-                    ds: e.domainLookupStart,
-                    de: e.domainLookupEnd,
-                    cs: e.connectStart,
-                    ss: e.secureConnectionStart,
-                    ce: e.connectEnd,
-                    qs: e.requestStart,
-                    ps: e.responseStart,
-                    pe: e.responseEnd,
-                    ts: e.transferSize,
-                },
-                meta: {
-                    n: e.name,
-                    i: e.initiatorType,
-                    p: e.nextHopProtocol,
-                }
-            })
-        }
+        const e = records[i];
+        data.resources.push({
+            metrics: {
+                ds: e.domainLookupStart,
+                de: e.domainLookupEnd,
+                cs: e.connectStart,
+                ss: e.secureConnectionStart,
+                ce: e.connectEnd,
+                qs: e.requestStart,
+                ps: e.responseStart,
+                pe: e.responseEnd,
+                ts: e.transferSize,
+            },
+            meta: {
+                n: e.name,
+                i: e.initiatorType,
+                p: e.nextHopProtocol,
+            }
+        })
     }
 
     if (takeConnection && window.navigator && window.navigator.connection) {
@@ -146,21 +128,31 @@ export const isPerformanceSupportedBrowser = () => {
 }
 
 /**
- *
+ * @param {function(string): boolean} filter
  * @returns {PerformanceResourceTiming[]}
  */
-export const takeTimingRecords = () => {
+export const takeTimingRecords = (filter) => {
     if (isPerformanceSupportedBrowser()) {
-        const entries = window.performance.getEntriesByType('resource');
+        const records = window.performance.getEntriesByType('resource');
 
         if ("function" == typeof window.performance.clearResourceTimings) {
             window.performance.clearResourceTimings()
         }
 
-        return entries;
+        return filter ? filterRecords(records, filter) : records;
     }
 
     return [];
+}
+
+/**
+ *
+ * @param {PerformanceResourceTiming[]} records
+ * @param {function(string): boolean} filter
+ * @returns {PerformanceResourceTiming[]}
+ */
+export const filterRecords = (records, filter) => {
+    return records.filter((r) => filter(r.name) );
 }
 
 /**
