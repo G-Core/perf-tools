@@ -4,14 +4,13 @@ import {
     createRecordsObserver,
     createPerfStatPackage,
     isFulfilledPerfStatPackage,
-    starFilterPaths
 } from './perf-lib';
 
 (function() {
     try {
         const buffer = createBufferWhen((records) => {
             const httpClient = createHttpClient('https://test.gcdn.co');
-            const pack = createPerfStatPackage(records, {filter: starFilterPaths, takeConnection: true});
+            const pack = createPerfStatPackage(records, {takeConnection: true});
             if (isFulfilledPerfStatPackage(pack)) {
                 httpClient(pack);
             }

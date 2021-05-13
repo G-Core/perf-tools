@@ -22,15 +22,24 @@ export const createHttpClient = (apiUrl) => {
  * @returns {(function(): boolean)|(function(*=): *)}
  * @param {string | RegExp} rawPatterns
  */
-export const createFilterPaths = (...rawPatterns) => {
+export const createFilter = (...rawPatterns) => {
     const patterns = rawPatterns.map((item) => new RegExp(item));
     return name => patterns.some((pattern) => pattern.test(name))
 }
 
 /**
+ *
+ * @param {string} patterns
+ * @returns {function(*): boolean}
+ */
+export const createStartsWithFilter = (...patterns) => {
+    return name => patterns.some((pattern) => name.startsWith(pattern))
+}
+
+/**
  * @returns {boolean}
  */
-export const starFilterPaths = name => true;
+export const starFilter = name => true;
 
 /**
  *
@@ -40,7 +49,7 @@ export const starFilterPaths = name => true;
  * @returns {{resources: *[], conn: *}}
  */
 export const createPerfStatPackage = (records, {
-    filter = starFilterPaths,
+    filter = starFilter,
     takeConnection = true
 }) => {
     const data = {

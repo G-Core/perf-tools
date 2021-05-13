@@ -1,6 +1,6 @@
 import {
     createHttpClient,
-    createFilterPaths,
+    createStartsWithFilter,
     createPerfStatPackage,
     isFulfilledPerfStatPackage,
     takeTimingRecords,
@@ -9,7 +9,7 @@ import {
 (function() {
     try {
         const httpClient = createHttpClient('https://api.gcdn.co/collect-wg');
-        const filter = createFilterPaths(...[
+        const filter = createStartsWithFilter(...[
             'https://ru-wotp.wgcdn.co',
             'https://sg-wotp.wgcdn.co',
             'https://eu-wotp.wgcdn.co',
