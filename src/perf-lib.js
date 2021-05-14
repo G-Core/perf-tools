@@ -40,18 +40,20 @@ export const createPerfStatPackage = (records, {
         resources: []
     };
 
+    const fixed = v => null == v ? 0 : Math.round(v);
+
     for (let i = 0; i <= records.length - 1; i++) {
         const e = records[i];
         data.resources.push({
             metrics: {
-                ds: e.domainLookupStart,
-                de: e.domainLookupEnd,
-                cs: e.connectStart,
-                ss: e.secureConnectionStart,
-                ce: e.connectEnd,
-                qs: e.requestStart,
-                ps: e.responseStart,
-                pe: e.responseEnd,
+                ds: fixed(e.domainLookupStart),
+                de: fixed(e.domainLookupEnd),
+                cs: fixed(e.connectStart),
+                ss: fixed(e.secureConnectionStart),
+                ce: fixed(e.connectEnd),
+                qs: fixed(e.requestStart),
+                ps: fixed(e.responseStart),
+                pe: fixed(e.responseEnd),
                 ts: e.transferSize,
             },
             meta: {
@@ -65,9 +67,9 @@ export const createPerfStatPackage = (records, {
     if (takeConnection && window.navigator && window.navigator.connection) {
         const c = window.navigator.connection;
         data.conn = {
-            d: c.downlink,
+            d: fixed(c.downlink * 1000),
             et: c.effectiveType,
-            rtt: c.rtt,
+            rtt: fixed(c.rtt),
         }
     }
 
@@ -83,11 +85,15 @@ export const isFulfilledPerfStatPackage = (data) => {
     return data && Array.isArray(data.resources) && data.resources.length > 0;
 }
 
+export const scheduleMacroTask = (callback) => {
+    setTimeout(callback, 0);
+};
+
 export const onDomReady = (callback) => {
     if (document.readyState !== 'loading'){
         callback();
     } else {
-        document.addEventListener('DOMContentLoaded', callback);
+        document.addEventListener('DOMContentLoaded', () => scheduleMacroTask(callback));
     }
 };
 
@@ -103,12 +109,21 @@ export const createFuncWithTimeout = (callback, timeout = 1000) => {
     return fn;
 };
 
-export const createBufferWhen = (rawCallback, bufferCount = 10, bufferTime = 1000) => {
+/**
+ *
+ * @param {function(*)} rawCallback
+ * @param {number} bufferCount
+ * @param {number} bufferTime
+ * @param {function(string): boolean} filter
+ * @returns {(function(PerformanceResourceTiming[]): (boolean))|*}
+ */
+export const createBufferWhen = (rawCallback, bufferCount = 10, bufferTime = 1000, filter) => {
     const buffer = [];
     const callback = createFuncWithTimeout(() => rawCallback(buffer), bufferTime);
 
-    return (entries) => {
-        buffer.push(...entries);
+    return (rawRecords) => {
+        const records = filter ? filterRecords(rawRecords, filter) : rawRecords;
+        buffer.push(...records);
 
         if (buffer.length < bufferCount) {
             return false;
@@ -161,7 +176,7 @@ export const filterRecords = (records, filter) => {
  * @param {string} type
  * @param {boolean} buffered
  */
-export const createRecordsObserver = (callback, type = 'resource', buffered = true) => {
+export const startRecordsObserver = (callback, type = 'resource', buffered = true) => {
     if (isPerformanceSupportedBrowser() && PerformanceObserver.supportedEntryTypes.includes("resource")) {
         new PerformanceObserver((list, observer) => {
             if (callback(list.getEntries())) {
