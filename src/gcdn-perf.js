@@ -1,7 +1,6 @@
 import {
-    createBufferWhen,
     createHttpClient,
-    startRecordsObserver,
+    takeTimingRecordsAsync,
     createPerfStatPackage,
     isFulfilledPerfStatPackage,
     createFilterOf
@@ -10,13 +9,12 @@ import {
 (function() {
     try {
         const httpClient = createHttpClient('https://insights-api.gcorelabs.com/collect-wg');
-        const filter = createFilterOf('http://bogdi.xyz', 'https://bogdi.xyz');
-        const handler = createBufferWhen((records) => {
+        const filter = createFilterOf('http://bogdi.xyz', 'https://bogdi.xyz', 'https://static.gcore.pro');
+        takeTimingRecordsAsync((records) => {
             const pack = createPerfStatPackage(records);
             if (isFulfilledPerfStatPackage(pack)) {
                 httpClient(pack);
             }
         }, 10, 1000, filter);
-        startRecordsObserver(handler);
     } catch(e) {}
 }())

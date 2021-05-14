@@ -9,10 +9,7 @@ import {
 (function() {
     try {
         const httpClient = createHttpClient('https://insights-api.gcorelabs.com/collect-wg');
-        const filter = createFilterOf(...[
-            'http://bogdi.xyz',
-            'https://bogdi.xyz',
-        ]);
+        const filter = createFilterOf('http://bogdi.xyz', 'https://bogdi.xyz');
         const records = takeTimingRecords(filter);
         const pack = createPerfStatPackage(records);
         if (isFulfilledPerfStatPackage(pack)) {

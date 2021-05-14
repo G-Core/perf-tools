@@ -1,5 +1,6 @@
 /**
  * @param {string} apiUrl
+ * @returns {function({resources: *[], conn: *})}
  */
 export const createHttpClient = (apiUrl) => {
     return  (rawData) => {
@@ -21,7 +22,7 @@ export const createHttpClient = (apiUrl) => {
 /**
  *
  * @param {string} patterns
- * @returns {function(*): boolean}
+ * @returns {function(string): boolean}
  */
 export const createFilterOf = (...patterns) => {
     return name => patterns.some((pattern) => name.indexOf(pattern) === 0)
@@ -78,86 +79,11 @@ export const createPerfStatPackage = (records, {
 
 /**
  *
- * @param data
+ * @param {{resources: *[], conn: *}} data
  * @returns {boolean}
  */
 export const isFulfilledPerfStatPackage = (data) => {
     return data && Array.isArray(data.resources) && data.resources.length > 0;
-}
-
-export const scheduleMacroTask = (callback) => {
-    setTimeout(callback, 0);
-};
-
-export const onDomReady = (callback) => {
-    if (document.readyState !== 'loading'){
-        callback();
-    } else {
-        document.addEventListener('DOMContentLoaded', () => scheduleMacroTask(callback));
-    }
-};
-
-export const createFuncWithTimeout = (callback, timeout = 1000) => {
-    let called = false;
-    const fn = () => {
-        if (!called) {
-            called = true;
-            callback();
-        }
-    };
-    setTimeout(fn, timeout);
-    return fn;
-};
-
-/**
- *
- * @param {function(*)} rawCallback
- * @param {number} bufferCount
- * @param {number} bufferTime
- * @param {function(string): boolean} filter
- * @returns {(function(PerformanceResourceTiming[]): (boolean))|*}
- */
-export const createBufferWhen = (rawCallback, bufferCount = 10, bufferTime = 1000, filter) => {
-    const buffer = [];
-    const callback = createFuncWithTimeout(() => rawCallback(buffer), bufferTime);
-
-    return (rawRecords) => {
-        const records = filter ? filterRecords(rawRecords, filter) : rawRecords;
-        buffer.push(...records);
-
-        if (buffer.length < bufferCount) {
-            return false;
-        } else {
-            callback();
-            return true;
-        }
-    }
-}
-
-/**
- *
- * @returns {boolean}
- */
-export const isPerformanceSupportedBrowser = () => {
-    return Boolean(window && window.performance && window.performance.getEntriesByType);
-}
-
-/**
- * @param {function(string): boolean} filter
- * @returns {PerformanceResourceTiming[]}
- */
-export const takeTimingRecords = (filter) => {
-    if (isPerformanceSupportedBrowser()) {
-        const records = window.performance.getEntriesByType('resource');
-
-        if ("function" == typeof window.performance.clearResourceTimings) {
-            window.performance.clearResourceTimings()
-        }
-
-        return filter ? filterRecords(records, filter) : records;
-    }
-
-    return [];
 }
 
 /**
@@ -171,17 +97,118 @@ export const filterRecords = (records, filter) => {
 }
 
 /**
- *
- * @param {function(PerformanceResourceTiming[]): boolean} callback
- * @param {string} type
- * @param {boolean} buffered
+ * @returns {boolean}
  */
-export const startRecordsObserver = (callback, type = 'resource', buffered = true) => {
-    if (isPerformanceSupportedBrowser() && PerformanceObserver.supportedEntryTypes.includes("resource")) {
-        new PerformanceObserver((list, observer) => {
-            if (callback(list.getEntries())) {
-                observer.disconnect();
-            }
-        }).observe({type, buffered});
+export const isPerformanceSupportedBrowser = () => {
+    return Boolean(window && window.performance && window.performance.getEntriesByType);
+}
+
+/**
+ * @param {function(string): boolean} filter
+ * @returns {PerformanceResourceTiming[]}
+ */
+export const takeTimingRecords = (filter) => {
+    if (isPerformanceSupportedBrowser()) {
+        const resourceRecords = window.performance.getEntriesByType('resource');
+        const navigationRecords = window.performance.getEntriesByType('navigation');
+        const records = resourceRecords.concat(navigationRecords);
+
+        if ("function" == typeof window.performance.clearResourceTimings) {
+            window.performance.clearResourceTimings()
+        }
+
+        return filter ? filterRecords(records, filter) : records;
+    }
+
+    return [];
+}
+
+/**
+ *
+ * @param {function()} callback
+ * @param {number} timeout
+ * @returns {function()}
+ */
+export const createFuncWithTimeout = (callback, timeout = 1000) => {
+    let called = false;
+    const fn = () => {
+        if (!called) {
+            called = true;
+            callback();
+        }
+    };
+
+    if (timeout > 0) {
+        setTimeout(fn, timeout);
+    }
+    return fn;
+};
+
+/**
+ *
+ * @param {function(*)} callback
+ */
+export const scheduleMacroTask = (callback) => {
+    setTimeout(callback, 0);
+};
+
+/**
+ *
+ * @param {function(*)} callback
+ */
+export const onDomReady = (callback) => {
+    if (document.readyState !== 'loading'){
+        callback();
+    } else {
+        document.addEventListener('DOMContentLoaded', () => scheduleMacroTask(callback));
+    }
+};
+
+/**
+ *
+ * @param {function(*)} callback
+ * @param {number} bufferCount
+ * @param {number} bufferAlive
+ * @param {function(string): boolean} filter
+ * @returns {(function(PerformanceResourceTiming[]): (boolean))|*}
+ */
+export const createBufferWhen = (callback, bufferCount = 10, bufferAlive = 1000, filter) => {
+    const buffer = [];
+    const callbackWithTimeout = createFuncWithTimeout(() => callback(buffer), bufferAlive);
+
+    return (rawRecords) => {
+        const records = filter ? filterRecords(rawRecords, filter) : rawRecords;
+        buffer.push(...records);
+
+        if (buffer.length < bufferCount) {
+            return false;
+        } else {
+            callbackWithTimeout();
+            return true;
+        }
+    }
+}
+
+/**
+ *
+ * @param {function(PerformanceResourceTiming[])} callback
+ * @param {number} bufferCount
+ * @param {number} bufferAlive
+ * @param {function(string): boolean} filter
+ */
+export const takeTimingRecordsAsync = (callback, bufferCount, bufferAlive, filter) => {
+    if (isPerformanceSupportedBrowser()
+        && PerformanceObserver.supportedEntryTypes.includes("resource")
+        && PerformanceObserver.supportedEntryTypes.includes("navigation")
+    ) {
+        onDomReady(() => {
+            const buffer = createBufferWhen(callback, bufferCount, bufferAlive, filter)
+            new PerformanceObserver((list, observer) => {
+                const records = list.getEntries();
+                if (buffer(records)) {
+                    observer.disconnect();
+                }
+            }).observe({entryTypes: ['resource', 'navigation']});
+        });
     }
 }

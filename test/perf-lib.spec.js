@@ -94,7 +94,7 @@ describe('function tests libs', () => {
         expect(isFulfilledPerfStatPackage(pack)).equal(true);
         expect(pack.resources.length).equal(2)
         expect(pack.conn).deep.equal({
-            d: 100,
+            d: 100000,
             et: '2g',
             rtt: 50
         })
