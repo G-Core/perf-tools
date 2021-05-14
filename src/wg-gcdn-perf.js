@@ -8,7 +8,7 @@ import {
 
 (function() {
     try {
-        const httpClient = createHttpClient('https://api.gcdn.co/collect-wg');
+        const httpClient = createHttpClient('https://insights-api.gcorelabs.com/collect-wg');
         const filter = createFilterOf(...[
             'https://ru-wotp.wgcdn.co',
             'https://sg-wotp.wgcdn.co',

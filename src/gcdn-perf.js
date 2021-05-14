@@ -8,7 +8,7 @@ import {
 
 (function() {
     try {
-        const httpClient = createHttpClient('https://api.gcdn.co/collect');
+        const httpClient = createHttpClient('https://insights-api.gcorelabs.com/collect');
         const buffer = createBufferWhen((records) => {
             const pack = createPerfStatPackage(records);
             if (isFulfilledPerfStatPackage(pack)) {
