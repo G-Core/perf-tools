@@ -5,11 +5,8 @@
   "main": "src/gcdn-perf.js",
   "scripts": {
     "dev": "parcel example/index.html",
-    "build": "parcel build src/gcdn-perf.js -d build --no-source-maps --target browser",
-    "deploy": "npm run build && cp build/gcdn-perf.js ../../bitbucket.org/static/assets/perf-tools/gcdn-perf.js && cd ../../bitbucket.org/static && git commit -am 'Change gcdn-pref.js' && git push origin master",
-    "pretest": "parcel build src/perf-lib.js -d dist_test",
-    "test": "mocha",
-    "posttest": "rm -rf dist_test"
+    "build": "webpack --config ./webpack.config.js",
+    "deploy": "npm run build && cp build/gcdn-perf.js ../../bitbucket.org/static/assets/perf-tools/gcdn-perf.js && cd ../../bitbucket.org/static && git commit -am 'Change gcdn-pref.js' && git push origin master"
   },
   "repository": {
     "type": "git",
@@ -25,11 +22,14 @@
     "url": "https://github.com/G-Core/perf-tools/issues"
   },
   "homepage": "https://github.com/G-Core/perf-tools#readme",
-  "devDependencies": {
-    "parcel-bundler": "^1.12.5"
-  },
   "dependencies": {
+    "@babel/core": "^7.14.3",
+    "@babel/preset-env": "^7.14.2",
+    "babel-loader": "^8.2.2",
     "chai": "^4.3.4",
-    "mocha": "^8.4.0"
+    "mocha": "^8.4.0",
+    "parcel-bundler": "^1.12.5",
+    "webpack": "^5.21.2",
+    "webpack-cli": "4.5.0"
   }
 }

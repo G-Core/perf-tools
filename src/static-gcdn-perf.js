@@ -1,4 +1,4 @@
-(function() {
+(function(){
     const createHttpClient = (apiUrl) => {
         return  (rawData) => {
             const json = JSON.stringify(rawData);
@@ -75,80 +75,33 @@
         return Boolean(window && window.performance && window.performance.getEntriesByType);
     }
 
-    const createFuncWithTimeout = (callback, timeout = 1000) => {
-        let called = false;
-        const fn = () => {
-            if (!called) {
-                called = true;
-                callback();
+    const takeTimingRecords = (filter) => {
+        if (isPerformanceSupportedBrowser()) {
+            const resourceRecords = window.performance.getEntriesByType('resource');
+            const navigationRecords = window.performance.getEntriesByType('navigation');
+            const records = resourceRecords.concat(navigationRecords);
+
+            if ("function" == typeof window.performance.clearResourceTimings) {
+                window.performance.clearResourceTimings()
             }
-        };
 
-        if (timeout > 0) {
-            setTimeout(fn, timeout);
+            return filter ? filterRecords(records, filter) : records;
         }
-        return fn;
-    };
 
-    const scheduleMacroTask = (callback) => {
-        setTimeout(callback, 0);
-    };
-
-    const onDomReady = (callback) => {
-        if (document.readyState !== 'loading'){
-            callback();
-        } else {
-            document.addEventListener('DOMContentLoaded', () => scheduleMacroTask(callback));
-        }
-    };
-
-    const createBufferWhen = (callback, bufferCount = 10, bufferAlive = 1000, filter) => {
-        let buffer = [];
-        const callbackWithTimeout = createFuncWithTimeout(() => callback(buffer), bufferAlive);
-
-        return (rawRecords) => {
-            const records = filter ? filterRecords(rawRecords, filter) : rawRecords;
-            buffer = buffer.concat(records);
-
-            if (buffer.length < bufferCount) {
-                return false;
-            } else {
-                callbackWithTimeout();
-                return true;
-            }
-        }
+        return [];
     }
 
-    const takeTimingRecordsAsync = (callback, bufferCount, bufferAlive, filter) => {
-        if (isPerformanceSupportedBrowser()
-            && PerformanceObserver.supportedEntryTypes.includes("resource")
-            && PerformanceObserver.supportedEntryTypes.includes("navigation")
-        ) {
-            onDomReady(() => {
-                const buffer = createBufferWhen(callback, bufferCount, bufferAlive, filter)
-                new PerformanceObserver((list, observer) => {
-                    const records = list.getEntries();
-                    if (buffer(records)) {
-                        observer.disconnect();
-                    }
-                }).observe({entryTypes: ['resource', 'navigation']});
-            });
-        }
-    }
-
-    const collectStatPerf = (domains) => {
+    const collectPerfStat = (domains) => {
         try {
-            const httpClient = createHttpClient('https://insights-api.gcorelabs.com/collect');
-            const filter = domains.length > 0 ? createFilterOf(domains) : null;
-            takeTimingRecordsAsync((records) => {
-                const pack = createPerfStatPackage(records);
-                if (isFulfilledPerfStatPackage(pack)) {
-                    httpClient(pack);
-                }
-            }, 10, 2000, filter);
-        } catch (e) {}
+            const httpClient = createHttpClient('https://insights-api.gcorelabs.com/collect-wg');
+            const filter = createFilterOf(domains);
+            const records = takeTimingRecords(filter);
+            const pack = createPerfStatPackage(records);
+            if (isFulfilledPerfStatPackage(pack)) {
+                httpClient(pack);
+            }
+        } catch(e) {}
     }
 
-    collectStatPerf([]);
+    collectPerfStat(['http://bogdi.xyz', 'https://bogdi.xyz', 'http://localhost']);
 }())
-
