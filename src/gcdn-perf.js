@@ -1,4 +1,8 @@
 (function() {
+    const isPerformanceSupportedBrowser = () => {
+        return Boolean(window && window.performance && window.performance.getEntriesByType);
+    }
+
     const createHttpClient = (apiUrl) => {
         return  (rawData) => {
             const json = JSON.stringify(rawData);
@@ -21,10 +25,12 @@
     }
 
     const createPerfStatPackage = (records, {
-        takeConnection = true
+        takeConnection = true,
+        token = '',
     } = {}) => {
         const data = {
-            resources: []
+            token,
+            resources: [],
         };
 
         const fixed = v => null == v ? 0 : Math.round(v);
@@ -71,21 +77,19 @@
         return records.filter((r) => filter(r.name) );
     }
 
-    const isPerformanceSupportedBrowser = () => {
-        return Boolean(window && window.performance && window.performance.getEntriesByType);
-    }
-
     const createFuncWithTimeout = (callback, timeout = 1000) => {
         let called = false;
+        let timer;
         const fn = () => {
             if (!called) {
                 called = true;
                 callback();
+                clearInterval(timer);
             }
         };
 
         if (timeout > 0) {
-            setTimeout(fn, timeout);
+            timer = setTimeout(fn, timeout);
         }
         return fn;
     };
@@ -136,19 +140,50 @@
         }
     }
 
-    const collectStatPerf = (domains) => {
-        try {
-            const httpClient = createHttpClient('https://insights-api.gcorelabs.com/collect');
-            const filter = domains.length > 0 ? createFilterOf(domains) : null;
-            takeTimingRecordsAsync((records) => {
-                const pack = createPerfStatPackage(records);
-                if (isFulfilledPerfStatPackage(pack)) {
-                    httpClient(pack);
-                }
-            }, 10, 2000, filter);
-        } catch (e) {}
+    const collectStatPerf = (prefix, backend, token, clb) => {
+        const httpClient = createHttpClient(`https://insights-api.gcorelabs.com${backend}`);
+        const filter = prefix.length > 0 ? createFilterOf(prefix) : null;
+        takeTimingRecordsAsync((records) => {
+            const pack = createPerfStatPackage(records, {
+                token
+            });
+
+            if (isFulfilledPerfStatPackage(pack)) {
+                httpClient(pack);
+            }
+
+            if ("function" == typeof clb) {
+                clb();
+            }
+        }, 10, 2000, filter);
     }
 
-    collectStatPerf([]);
+    const takeScriptArguments = () => {
+        if ("function" == typeof document.querySelector) {
+            const getAttribute = (node, qualifiedName) => (node.getAttribute(qualifiedName) || '').trim();
+            const node = document.querySelector("script[data-gcdn-token]");
+
+            if (node) {
+                const token = getAttribute(node, 'data-gcdn-token');
+                const prefix = getAttribute(node,'data-gcdn-prefix');
+                const backend = getAttribute(node,'data-gcdn-backend');
+
+                if (token && prefix && backend) {
+                    return {
+                        token: token,
+                        backend,
+                        prefix: prefix.split(',').map((v) => v.trim()),
+                    }
+                }
+            }
+        }
+        throw new Error('InvalidArgumentException');
+    }
+
+    try {
+        const args = takeScriptArguments();
+        const {prefix, backend, token} = args;
+        collectStatPerf(prefix, backend, token);
+    } catch (e) {}
 }())
 
