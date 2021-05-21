@@ -1,4 +1,6 @@
 (function() {
+    const defaultPrefix = ['static.gcore.pro'];
+
     const isPerformanceSupportedBrowser = () => {
         return Boolean(window && window.performance && window.performance.getEntriesByType);
     }
@@ -100,7 +102,7 @@
 
     const onDomReady = (callback) => {
         if (document.readyState !== 'loading'){
-            callback();
+            scheduleMacroTask(callback);
         } else {
             document.addEventListener('DOMContentLoaded', () => scheduleMacroTask(callback));
         }
@@ -109,18 +111,42 @@
     const createBufferWhen = (callback, bufferCount = 10, bufferAlive = 1000, filter) => {
         let buffer = [];
         const callbackWithTimeout = createFuncWithTimeout(() => callback(buffer), bufferAlive);
-
         return (rawRecords) => {
             const records = filter ? filterRecords(rawRecords, filter) : rawRecords;
-            buffer = buffer.concat(records);
-
-            if (buffer.length < bufferCount) {
-                return false;
-            } else {
-                callbackWithTimeout();
-                return true;
+            if (records.length > 0) {
+                buffer = buffer.concat(records);
+                if (buffer.length >= bufferCount) {
+                    callbackWithTimeout();
+                }
             }
         }
+    }
+
+    const createBufferCallback = (callback, close) => {
+        return (items) => {
+            try {
+                callback(items);
+                close();
+            } catch(e) {
+                close(e)
+            }
+        }
+    }
+
+    const takeTimingRecords = (filter) => {
+        if (isPerformanceSupportedBrowser()) {
+            const resourceRecords = window.performance.getEntriesByType('resource');
+            const navigationRecords = window.performance.getEntriesByType('navigation');
+            const records = navigationRecords.concat(resourceRecords);
+
+            if ("function" == typeof window.performance.clearResourceTimings) {
+                window.performance.clearResourceTimings()
+            }
+
+            return filter ? filterRecords(records, filter) : records;
+        }
+
+        return [];
     }
 
     const takeTimingRecordsAsync = (callback, bufferCount, bufferAlive, filter) => {
@@ -129,18 +155,17 @@
             && PerformanceObserver.supportedEntryTypes.includes("navigation")
         ) {
             onDomReady(() => {
-                const buffer = createBufferWhen(callback, bufferCount, bufferAlive, filter)
-                new PerformanceObserver((list, observer) => {
-                    const records = list.getEntries();
-                    if (buffer(records)) {
-                        observer.disconnect();
-                    }
-                }).observe({entryTypes: ['resource', 'navigation']});
+                let observer;
+                const bufferCallback = createBufferCallback(callback, () => observer && observer.disconnect());
+                const buffer = createBufferWhen(bufferCallback, bufferCount, bufferAlive, filter);
+                observer = new PerformanceObserver(l => buffer(l.getEntries()));
+                observer.observe({entryTypes: ['resource']});
+                buffer(takeTimingRecords(filter));
             });
         }
     }
 
-    const collectStatPerf = (prefix, backend, token, clb) => {
+    const collectStatPerf = (prefix, backend, token) => {
         const httpClient = createHttpClient(`https://insights-api.gcorelabs.com${backend}`);
         const filter = prefix.length > 0 ? createFilterOf(prefix) : null;
         takeTimingRecordsAsync((records) => {
@@ -150,10 +175,6 @@
 
             if (isFulfilledPerfStatPackage(pack)) {
                 httpClient(pack);
-            }
-
-            if ("function" == typeof clb) {
-                clb();
             }
         }, 10, 2000, filter);
     }
@@ -180,10 +201,22 @@
         throw new Error('InvalidArgumentException');
     }
 
+    const transformPrefix = (rawPrefix) => {
+        return [...defaultPrefix, ...rawPrefix].reduce((acc, item) => {
+                if (!item.startsWith('http')) {
+                    acc.push(`https://${item}`, `http://${item}`);
+                } else {
+                    acc.push(item);
+                }
+                return acc;
+            }, []);
+    }
+
     try {
         const args = takeScriptArguments();
         const {prefix, backend, token} = args;
-        collectStatPerf(prefix, backend, token);
+        const transformedPrefix = transformPrefix(prefix);
+        collectStatPerf(transformedPrefix, backend, token);
     } catch (e) {}
 }())
 
