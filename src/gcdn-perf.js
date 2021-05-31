@@ -1,5 +1,8 @@
 (function() {
     const defaultPrefix = ['static.gcore.pro'];
+    const defaultBackend = '/collect';
+    const defaultDelay = 1000;
+    const defaultApiURL = 'https://insights-api.gcorelabs.com';
 
     const isPerformanceSupportedBrowser = () => {
         return Boolean(window && window.performance && window.performance.getEntriesByType);
@@ -130,42 +133,50 @@
     }
 
     const takeTimingRecordsAsync = (callback, timeout, filter) => {
-        if (isPerformanceSupportedBrowser()
-            && PerformanceObserver.supportedEntryTypes.includes("resource")
-            && PerformanceObserver.supportedEntryTypes.includes("navigation")
-        ) {
-            onDomReady(() => createFuncWithTimeout(() => {
-                callback(takeTimingRecords(filter));
-            }, timeout));
-        }
+        onDomReady(() => createFuncWithTimeout(() => {
+            callback(takeTimingRecords(filter));
+        }, timeout));
     }
 
-    const collectStatPerf = (prefix, backend, token) => {
-        const httpClient = createHttpClient(`https://insights-api.gcorelabs.com${backend}`);
+    const collectStatPerf = (prefix, backend, token, delay) => {
+        const httpClient = createHttpClient(`${defaultApiURL}${backend}`);
         const filter = prefix.length > 0 ? createFilterOf(prefix) : null;
-        takeTimingRecordsAsync((records) => {
+        const handler = (records) => {
             const pack = createPerfStatPackage(records, {token});
             if (isFulfilledPerfStatPackage(pack)) {
                 httpClient(pack);
             }
-        }, 1000, filter);
+        };
+
+        if (delay > 0) {
+            takeTimingRecordsAsync(handler, delay, filter);
+        } else {
+            handler(takeTimingRecords(filter))
+        }
     }
+
+    const getAttribute = (node, qualifiedName, defaultValue) => (node.getAttribute(qualifiedName) || '').trim() || defaultValue;
+
+    const getAttributeNumber = (node, qualifiedName, defaultValue) => parseInt(getAttribute(node, qualifiedName), 10) || defaultValue;
+
+    const getAttributeStrings = (node, qualifiedName, format = 'csv') => getAttribute(node, qualifiedName).split(',').map((v) => v.trim());
 
     const takeScriptArguments = () => {
         if ("function" == typeof document.querySelector) {
-            const getAttribute = (node, qualifiedName) => (node.getAttribute(qualifiedName) || '').trim();
             const node = document.querySelector("script[data-gcdn-token]");
 
             if (node) {
                 const token = getAttribute(node, 'data-gcdn-token');
-                const prefix = getAttribute(node,'data-gcdn-prefix');
-                const backend = getAttribute(node,'data-gcdn-backend');
+                const prefix = getAttributeStrings(node,'data-gcdn-prefix');
+                const backend = getAttribute(node,'data-gcdn-backend', defaultBackend);
+                const delay = getAttributeNumber(node,'data-gcdn-delay', defaultDelay);
 
-                if (token && prefix && backend) {
+                if (token) {
                     return {
-                        token: token,
+                        token,
                         backend,
-                        prefix: prefix.split(',').map((v) => v.trim()),
+                        delay,
+                        prefix,
                     }
                 }
             }
@@ -186,9 +197,9 @@
 
     try {
         const args = takeScriptArguments();
-        const {prefix, backend, token} = args;
+        const {prefix, backend, token, delay} = args;
         const transformedPrefix = transformPrefix(prefix);
-        collectStatPerf(transformedPrefix, backend, token);
+        collectStatPerf(transformedPrefix, backend, token, delay);
     } catch (e) {}
 }())
 

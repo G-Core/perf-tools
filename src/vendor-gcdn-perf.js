@@ -1,29 +1,19 @@
 (function(){
     const createHttpClient = (apiUrl) => {
-        return  (rawData) => {
+        return (rawData) => {
             const json = JSON.stringify(rawData);
-
-            if (navigator && "function" == typeof navigator.sendBeacon) {
-                navigator.sendBeacon(apiUrl, new Blob([json],{
-                    type: "application/json"
-                }))
-            } else {
-                const req = new XMLHttpRequest();
-                req.open("POST", apiUrl, true);
-                req.setRequestHeader("content-type", "application/json");
-                req.send(json);
-            }
+            const req = new XMLHttpRequest();
+            req.open("POST", apiUrl, true);
+            req.setRequestHeader("content-type", "application/json");
+            req.send(json);
         }
     }
 
-    const createFilterOf = (patterns) => {
-        return name => patterns.some((pattern) => name.indexOf(pattern) === 0)
-    }
+    const createFilterOf = (patterns) => name => patterns.some((pattern) => name.indexOf(pattern) === 0)
 
-    const createPerfStatPackage = (records, {
-        takeConnection = true
-    } = {}) => {
+    const createPerfStatPackage = (records, {takeConnection = true, token = ''} = {}) => {
         const data = {
+            token,
             resources: []
         };
 
@@ -63,17 +53,11 @@
         return data;
     }
 
-    const isFulfilledPerfStatPackage = (data) => {
-        return data && Array.isArray(data.resources) && data.resources.length > 0;
-    }
+    const isFulfilledPerfStatPackage = (data) => data && Array.isArray(data.resources) && data.resources.length > 0
 
-    const filterRecords = (records, filter) => {
-        return records.filter((r) => filter(r.name) );
-    }
+    const filterRecords = (records, filter) => records.filter((r) => filter(r.name))
 
-    const isPerformanceSupportedBrowser = () => {
-        return Boolean(window && window.performance && window.performance.getEntriesByType);
-    }
+    const isPerformanceSupportedBrowser = () => Boolean(window && window.performance && window.performance.getEntriesByType)
 
     const takeTimingRecords = (filter) => {
         if (isPerformanceSupportedBrowser()) {
@@ -91,17 +75,28 @@
         return [];
     }
 
-    const collectPerfStat = (domains) => {
+    const transformPrefix = (rawPrefix) =>
+        rawPrefix.reduce((acc, item) => {
+            if (!item.startsWith('http')) {
+                acc.push(`https://${item}`, `http://${item}`);
+            } else {
+                acc.push(item);
+            }
+            return acc;
+        }, [])
+
+    const collectPerfStat = (prefix, token) => {
         try {
-            const httpClient = createHttpClient('https://insights-api.gcorelabs.com/collect-wg');
-            const filter = createFilterOf(domains);
+            const httpClient = createHttpClient('https://insights-api.gcorelabs.com/collect');
+            const transformedPrefix = transformPrefix(prefix);
+            const filter = createFilterOf(transformedPrefix);
             const records = takeTimingRecords(filter);
-            const pack = createPerfStatPackage(records);
+            const pack = createPerfStatPackage(records, {token, takeConnection: true});
             if (isFulfilledPerfStatPackage(pack)) {
                 httpClient(pack);
             }
         } catch(e) {}
     }
 
-    collectPerfStat(['http://bogdi.xyz', 'https://bogdi.xyz', 'http://localhost']);
+    collectPerfStat(['bogdi.xyz', 'http://localhost'], 'cc00d656-2754-4dc6-9d4b-8ef5c56a40be');
 }())
