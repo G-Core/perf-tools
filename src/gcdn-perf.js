@@ -75,8 +75,12 @@
         return data && Array.isArray(data.resources) && data.resources.length > 0;
     }
 
+    const uniqueRecords = (r, idx, arr) => arr.findIndex((t) => t.name === r.name) === idx;
+
     const filterRecords = (records, filter) => {
-        return records.filter((r) => filter(r.name) );
+        return records
+            .filter((r) => filter(r.name))
+            .filter(uniqueRecords);
     }
 
     const createFuncWithTimeout = (callback, timeout = 1000) => {
@@ -108,36 +112,12 @@
         }
     };
 
-    const createBufferWhen = (callback, bufferCount = 10, bufferAlive = 1000, filter) => {
-        let buffer = [];
-        const callbackWithTimeout = createFuncWithTimeout(() => callback(buffer), bufferAlive);
-        return (rawRecords) => {
-            const records = filter ? filterRecords(rawRecords, filter) : rawRecords;
-            if (records.length > 0) {
-                buffer = buffer.concat(records);
-                if (buffer.length >= bufferCount) {
-                    callbackWithTimeout();
-                }
-            }
-        }
-    }
-
-    const createBufferCallback = (callback, close) => {
-        return (items) => {
-            try {
-                callback(items);
-                close();
-            } catch(e) {
-                close(e)
-            }
-        }
-    }
-
     const takeTimingRecords = (filter) => {
         if (isPerformanceSupportedBrowser()) {
             const resourceRecords = window.performance.getEntriesByType('resource');
             const navigationRecords = window.performance.getEntriesByType('navigation');
-            const records = navigationRecords.concat(resourceRecords);
+            const records = navigationRecords
+                .concat(resourceRecords);
 
             if ("function" == typeof window.performance.clearResourceTimings) {
                 window.performance.clearResourceTimings()
@@ -149,19 +129,14 @@
         return [];
     }
 
-    const takeTimingRecordsAsync = (callback, bufferCount, bufferAlive, filter) => {
+    const takeTimingRecordsAsync = (callback, timeout, filter) => {
         if (isPerformanceSupportedBrowser()
             && PerformanceObserver.supportedEntryTypes.includes("resource")
             && PerformanceObserver.supportedEntryTypes.includes("navigation")
         ) {
-            onDomReady(() => {
-                let observer;
-                const bufferCallback = createBufferCallback(callback, () => observer && observer.disconnect());
-                const buffer = createBufferWhen(bufferCallback, bufferCount, bufferAlive, filter);
-                observer = new PerformanceObserver(l => buffer(l.getEntries()));
-                observer.observe({entryTypes: ['resource']});
-                buffer(takeTimingRecords(filter));
-            });
+            onDomReady(() => createFuncWithTimeout(() => {
+                callback(takeTimingRecords(filter));
+            }, timeout));
         }
     }
 
@@ -169,14 +144,11 @@
         const httpClient = createHttpClient(`https://insights-api.gcorelabs.com${backend}`);
         const filter = prefix.length > 0 ? createFilterOf(prefix) : null;
         takeTimingRecordsAsync((records) => {
-            const pack = createPerfStatPackage(records, {
-                token
-            });
-
+            const pack = createPerfStatPackage(records, {token});
             if (isFulfilledPerfStatPackage(pack)) {
                 httpClient(pack);
             }
-        }, 10, 2000, filter);
+        }, 1000, filter);
     }
 
     const takeScriptArguments = () => {
