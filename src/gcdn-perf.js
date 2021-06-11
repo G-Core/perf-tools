@@ -1,5 +1,5 @@
 (function() {
-    const defaultPrefix = ['static.gcore.pro'];
+    const defaultPrefix = ['static.gcore.pro', 'fonts.gstatic.com', 'fonts.googleapis.com', 'cdnjs.cloudflare.com'];
     const defaultBackend = '/collect';
     const defaultDelay = 1000;
     const defaultApiURL = 'https://insights-api.gcorelabs.com';
