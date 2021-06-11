@@ -2,6 +2,7 @@
     const defaultPrefix = ['static.gcore.pro'];
     const defaultBackend = '/collect';
     const defaultDelay = 1000;
+    const defaultResolveRandom = true;
     const defaultApiURL = 'https://insights-api.gcorelabs.com';
 
     const isPerformanceSupportedBrowser = () => {
@@ -37,29 +38,30 @@
             token,
             resources: [],
         };
-
         const fixed = v => null == v ? 0 : Math.round(v);
 
-        for (let i = 0; i <= records.length - 1; i++) {
-            const e = records[i];
-            data.resources.push({
-                metrics: {
-                    ds: fixed(e.domainLookupStart),
-                    de: fixed(e.domainLookupEnd),
-                    cs: fixed(e.connectStart),
-                    ss: fixed(e.secureConnectionStart),
-                    ce: fixed(e.connectEnd),
-                    qs: fixed(e.requestStart),
-                    ps: fixed(e.responseStart),
-                    pe: fixed(e.responseEnd),
-                    ts: e.transferSize,
-                },
-                meta: {
-                    n: e.name,
-                    i: e.initiatorType,
-                    p: e.nextHopProtocol,
-                }
-            })
+        if (Array.isArray(records)) {
+            for (let i = 0; i <= records.length - 1; i++) {
+                const e = records[i];
+                data.resources.push({
+                    metrics: {
+                        ds: fixed(e.domainLookupStart),
+                        de: fixed(e.domainLookupEnd),
+                        cs: fixed(e.connectStart),
+                        ss: fixed(e.secureConnectionStart),
+                        ce: fixed(e.connectEnd),
+                        qs: fixed(e.requestStart),
+                        ps: fixed(e.responseStart),
+                        pe: fixed(e.responseEnd),
+                        ts: e.transferSize,
+                    },
+                    meta: {
+                        n: e.name,
+                        i: e.initiatorType,
+                        p: e.nextHopProtocol,
+                    }
+                })
+            }
         }
 
         if (takeConnection && window.navigator && window.navigator.connection) {
@@ -115,30 +117,40 @@
         }
     };
 
+    const takeTimingByName = (name) => {
+        if (isPerformanceSupportedBrowser()) {
+            return Promise.resolve(window.performance.getEntriesByName(name));
+        }
+        return Promise.resolve([]);
+    }
+
     const takeTimingRecords = (filter) => {
         if (isPerformanceSupportedBrowser()) {
             const resourceRecords = window.performance.getEntriesByType('resource');
             const navigationRecords = window.performance.getEntriesByType('navigation');
-            const records = navigationRecords
-                .concat(resourceRecords);
-
-            if ("function" == typeof window.performance.clearResourceTimings) {
-                window.performance.clearResourceTimings()
-            }
-
-            return filter ? filterRecords(records, filter) : records;
+            const records = [].concat(navigationRecords, resourceRecords);
+            return Promise.resolve(filter ? filterRecords(records, filter) : records);
         }
 
-        return [];
+        return Promise.resolve([]);
     }
 
-    const takeTimingRecordsAsync = (callback, timeout, filter) => {
-        onDomReady(() => createFuncWithTimeout(() => {
-            callback(takeTimingRecords(filter));
-        }, timeout));
+    const takeTimingRecordsAsync = (timeout, filter) => {
+        return new Promise((resolve) => {
+            onDomReady(() => createFuncWithTimeout(() => {
+                resolve(takeTimingRecords(filter));
+            }, timeout));
+        })
     }
 
-    const collectStatPerf = (prefix, backend, token, delay) => {
+    const takeTimingResolveRandom = () => {
+        const ts = Date.now();
+        const url = `https://${ts}-${makeRandomLetter(5)}.gcdn.co/`;
+        const handler = () => takeTimingByName(url);
+        return fetch(url).then(handler, handler);
+    }
+
+    const collectStatPerf = (prefix, backend, token, delay, resolveRandom) => {
         const httpClient = createHttpClient(`${defaultApiURL}${backend}`);
         const filter = prefix.length > 0 ? createFilterOf(prefix) : null;
         const handler = (records) => {
@@ -148,16 +160,28 @@
             }
         };
 
+        const tasks = [];
         if (delay > 0) {
-            takeTimingRecordsAsync(handler, delay, filter);
+            tasks.push(takeTimingRecordsAsync(delay, filter));
         } else {
-            handler(takeTimingRecords(filter))
+            tasks.push(takeTimingRecords(filter))
         }
+
+        if (resolveRandom) {
+            tasks.push(takeTimingResolveRandom());
+        }
+
+        return Promise.all(tasks)
+            .then((records) => [].concat(...records))
+            .then(handler);
     }
 
-    const getAttribute = (node, qualifiedName, defaultValue) => (node.getAttribute(qualifiedName) || '').trim() || defaultValue;
+    const getAttribute = (node, qualifiedName, defaultValue) => {
+        const value = (node.getAttribute(qualifiedName) || '').trim();
+        return value === '' ? defaultValue : value;
+    };
 
-    const getAttributeNumber = (node, qualifiedName, defaultValue) => parseInt(getAttribute(node, qualifiedName), 10) || defaultValue;
+    const getAttributeNumber = (node, qualifiedName, defaultValue = '') => parseInt(getAttribute(node, qualifiedName), 10) || defaultValue;
 
     const getAttributeStrings = (node, qualifiedName, format = 'csv') => getAttribute(node, qualifiedName).split(',').map((v) => v.trim());
 
@@ -170,12 +194,14 @@
                 const prefix = getAttributeStrings(node,'data-gcdn-prefix');
                 const backend = getAttribute(node,'data-gcdn-backend', defaultBackend);
                 const delay = getAttributeNumber(node,'data-gcdn-delay', defaultDelay);
+                const resolveRandom = getAttribute(node,'data-resolve-random', defaultResolveRandom);
 
                 if (token) {
                     return {
                         token,
                         backend,
                         delay,
+                        resolveRandom,
                         prefix,
                     }
                 }
@@ -195,11 +221,23 @@
             }, []);
     }
 
+    const makeRandomLetter = length => {
+        let result = '';
+        const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        const charactersLength = characters.length;
+        for (let i = 0; i < length; i++ ) {
+            result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        }
+        return result;
+    };
+
     try {
-        const args = takeScriptArguments();
-        const {prefix, backend, token, delay} = args;
-        const transformedPrefix = transformPrefix(prefix);
-        collectStatPerf(transformedPrefix, backend, token, delay);
+        if (isPerformanceSupportedBrowser()) {
+            const args = takeScriptArguments();
+            const {prefix, backend, token, delay, resolveRandom} = args;
+            const transformedPrefix = transformPrefix(prefix);
+            collectStatPerf(transformedPrefix, backend, token, delay, resolveRandom).then();
+        }
     } catch (e) {}
 }())
 
