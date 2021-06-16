@@ -2,6 +2,7 @@
     const defaultPrefix = ['static.gcore.pro', 'fonts.gstatic.com', 'fonts.googleapis.com', 'cdnjs.cloudflare.com'];
     const defaultBackend = '/collect';
     const defaultDelay = 1000;
+    const useNavigatorBeacon = false;
     const defaultApiURL = 'https://insights-api.gcorelabs.com';
 
     const isPerformanceSupportedBrowser = () => {
@@ -12,7 +13,7 @@
         return  (rawData) => {
             const json = JSON.stringify(rawData);
 
-            if (navigator && "function" == typeof navigator.sendBeacon) {
+            if (useNavigatorBeacon && navigator && "function" == typeof navigator.sendBeacon) {
                 navigator.sendBeacon(apiUrl, new Blob([json],{
                     type: "application/json"
                 }))
