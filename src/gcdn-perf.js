@@ -139,8 +139,8 @@
         }, timeout));
     }
 
-    const collectStatPerf = (prefix, backend, token, delay) => {
-        const httpClient = createHttpClient(`${defaultApiURL}${backend}`);
+    const collectStatPerf = (prefix, api, backend, token, delay) => {
+        const httpClient = createHttpClient(`${api}${backend}`);
         const filter = prefix.length > 0 ? createFilterOf(prefix) : null;
         const handler = (records) => {
             const pack = createPerfStatPackage(records, {token});
@@ -169,12 +169,14 @@
             if (node) {
                 const token = getAttribute(node, 'data-gcdn-token');
                 const prefix = getAttributeStrings(node,'data-gcdn-prefix');
+                const api = getAttribute(node, 'data-gcdn-api', defaultApiURL);
                 const backend = getAttribute(node,'data-gcdn-backend', defaultBackend);
                 const delay = getAttributeNumber(node,'data-gcdn-delay', defaultDelay);
 
                 if (token) {
                     return {
                         token,
+                        api,
                         backend,
                         delay,
                         prefix,
@@ -198,9 +200,9 @@
 
     try {
         const args = takeScriptArguments();
-        const {prefix, backend, token, delay} = args;
+        const {prefix, api, backend, token, delay} = args;
         const transformedPrefix = transformPrefix(prefix);
-        collectStatPerf(transformedPrefix, backend, token, delay);
+        collectStatPerf(transformedPrefix, api, backend, token, delay);
     } catch (e) {}
 }())
 
