@@ -3,7 +3,7 @@
     const defaultBackend = '/collect';
     const defaultDelay = 1000;
     const useNavigatorBeacon = false;
-    const defaultApiURL = 'https://insights-api.gcorelabs.com';
+    const defaultApiURL = 'https://api.gcorelabs.com/cdn/insights';
 
     const isPerformanceSupportedBrowser = () => {
         return Boolean(window && window.performance && window.performance.getEntriesByType);
