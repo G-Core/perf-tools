@@ -87,7 +87,7 @@
 
     const collectPerfStat = (prefix, token) => {
         try {
-            const httpClient = createHttpClient('https://api.gcorelabs.com/cdn/insights/collect');
+            const httpClient = createHttpClient('https://api.gcore.com/cdn/insights/collect');
             const transformedPrefix = transformPrefix(prefix);
             const filter = createFilterOf(transformedPrefix);
             const records = takeTimingRecords(filter);
